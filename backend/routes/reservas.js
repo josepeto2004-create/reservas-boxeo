@@ -80,8 +80,9 @@ router.get('/mis-reservas', verificarToken, async (req, res) => {
 // ─────────────────────────────────────────────
 // POST /api/reservas
 // El alumno hace una reserva.
-// REGLA: solo puede tener UNA reserva activa por día.
-// Si quiere otro turno, primero debe cancelar la que tiene.
+// REGLAS:
+//  - No se puede reservar en fin de semana (solo lunes a viernes)
+//  - Solo una reserva activa por día (cualquier turno)
 // ─────────────────────────────────────────────
 router.post('/reservas', verificarToken, async (req, res) => {
   if (req.usuario.rol !== 'alumno') {
@@ -95,8 +96,14 @@ router.post('/reservas', verificarToken, async (req, res) => {
     return res.status(400).json({ error: 'turno_id es obligatorio' });
   }
 
+  // ── Bloquear reservas en fin de semana ──
+  const diaSemana = new Date(fecha + 'T12:00:00').getDay(); // 0 = domingo, 6 = sábado
+  if (diaSemana === 0 || diaSemana === 6) {
+    return res.status(403).json({ error: 'El club no abre los fines de semana. Solo se puede reservar de lunes a viernes.' });
+  }
+
   try {
-    // ── Comprobar si el alumno YA tiene una reserva ese día (en cualquier turno) ──
+    // ── Comprobar si el alumno YA tiene una reserva ese día ──
     const { rows: reservaExistente } = await pool.query(
       `SELECT t.etiqueta
        FROM reservas r
